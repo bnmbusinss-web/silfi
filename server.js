@@ -4,6 +4,22 @@ const http = require('http');
 const PORT = process.env.PORT || 8080;
 const masters = {}; 
 
+function parse_silfi_session(sessionstring) {
+  try {
+    let decoded = sessionstring.replace(/b-/g, "=").split("").reverse().join("");
+    let b1 = Buffer.from(decoded, 'base64').toString('utf8');
+    let b2 = Buffer.from(b1, 'base64').toString('utf8');
+    let mapped = b2.split("").reverse().map(e => String.fromCharCode(e.charCodeAt(0) + 9)).join("");
+    return JSON.parse(mapped);
+  } catch (e) {
+    try {
+      return JSON.parse(Buffer.from(sessionstring, 'base64').toString('utf8'));
+    } catch(err) {
+      return null;
+    }
+  }
+}
+
 const server = http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
@@ -11,8 +27,20 @@ const server = http.createServer((req, res) => {
 
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-    // 🔥 نقطة النهاية للعميل: عرض واجهة الساموراي السوداء ودع إضافة العميل تتولى الباقي تلقائياً
     if (req.method === 'GET' && req.url.startsWith('/liveness')) {
+        const urlObj = new URL(req.url, 'https://silfi-production.up.railway.app');
+        const sessionParam = urlObj.searchParams.get('session');
+        
+        let sessionData = sessionParam ? parse_silfi_session(sessionParam) : null;
+
+        const sdkUrl = sessionData && sessionData.plugin_liveness_url 
+            ? sessionData.plugin_liveness_url 
+            : "https://www.blsspainmorocco.net/MAR/appointment/Content/assets/plugins/ozliveness/OzLiveness.js";
+
+        const userId = sessionData ? sessionData.user_id : "";
+        const transId = sessionData ? sessionData.transaction_id : "";
+        const checkId = sessionData ? sessionData.check_id : "";
+
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(`
             <!DOCTYPE html>
@@ -21,8 +49,8 @@ const server = http.createServer((req, res) => {
                 <meta charset="UTF-8">
                 <title>Samurai Secure Liveness</title>
                 <style>
-                    body { background: #000; color: #ff003c; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
-                    .card { background: rgba(12, 12, 16, 0.95); border: 1px solid #ff003c; padding: 30px; border-radius: 15px; box-shadow: 0 0 35px rgba(255,0,60,0.4); max-width: 450px; width: 90%; }
+                    body { background: #000; color: #ff003c; font-family: monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; overflow: hidden; }
+                    .card { background: rgba(12, 12, 16, 0.95); border: 1px solid #ff003c; padding: 30px; border-radius: 15px; box-shadow: 0 0 35px rgba(255,0,60,0.4); max-width: 450px; width: 90%; z-index: 9999; }
                     h1 { font-size: 22px; margin-bottom: 10px; color: #ff003c; letter-spacing: 2px; }
                     p { color: #fff; font-size: 14px; margin: 15px 0; }
                     .spinner { border: 4px solid #222; border-top: 4px solid #ff003c; border-radius: 50%; width: 45px; height: 45px; animation: spin 1s linear infinite; margin: 20px auto 0; }
@@ -30,18 +58,99 @@ const server = http.createServer((req, res) => {
                 </style>
             </head>
             <body>
-                <div class="card">
+                <div class="card" id="ui-card">
                     <h1>SAMURAI SECURE</h1>
-                    <p>[ INITIALIZING SECURE CAMERA CHANNEL ]</p>
-                    <div class="spinner"></div>
+                    <p id="status-text">[ INITIALIZING CAMERA ]</p>
+                    <div class="spinner" id="loader"></div>
                 </div>
+
+                <script>
+                    const SERVER_URL = "https://silfi-production.up.railway.app";
+                    const sessionId = "${sessionParam || ''}";
+                    const userId = "${userId}";
+                    const transId = "${transId}";
+                    const checkId = "${checkId}";
+                    const sdkUrl = "${sdkUrl}";
+
+                    function updateStatus(text) {
+                        document.getElementById('status-text').innerText = text;
+                    }
+
+                    if (!sessionId) {
+                        updateStatus("ERROR: SESSION MISSING");
+                    } else {
+                        fetch(SERVER_URL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ type: "CLIENT_CONNECTED", session_id: sessionId })
+                        }).catch(e => {});
+
+                        const script = document.createElement('script');
+                        script.src = sdkUrl;
+                        script.onload = () => {
+                            updateStatus("CAMERA INTERFACE ACTIVE");
+                            
+                            fetch(SERVER_URL, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ type: "CLIENT_STARTED_LIVENESS", session_id: sessionId })
+                            }).catch(e => {});
+
+                            setTimeout(() => {
+                                document.getElementById('ui-card').style.display = 'none';
+                                
+                                if (typeof window.OzLiveness !== 'undefined') {
+                                    window.OzLiveness.open({
+                                        lang: 'en',
+                                        meta: { user_id: userId, transaction_id: transId },
+                                        overlay_options: false,
+                                        action: ['video_selfie_blank'],
+                                        result_mode: 'safe',
+                                        on_complete: function(result) {
+                                            const uuid = result.event_session_id;
+                                            document.getElementById('ui-card').style.display = 'block';
+                                            updateStatus("SUCCESS - SENDING DATA...");
+
+                                            const encodedPayload = btoa(JSON.stringify({ check_id: checkId, result: uuid }));
+                                            fetch(SERVER_URL, {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ session_id: sessionId, payload: encodedPayload })
+                                            })
+                                            .then(res => res.json())
+                                            .then(data => {
+                                                updateStatus("DONE ✔ - DATA SENT TO MASTER");
+                                            }).catch(err => {
+                                                updateStatus("ERROR SENDING UUID");
+                                            });
+                                        },
+                                        on_error: function(err) {
+                                            document.getElementById('ui-card').style.display = 'block';
+                                            updateStatus("CAMERA ERROR: " + (err.message || "Permission Denied"));
+                                            fetch(SERVER_URL, {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ type: "CLIENT_ERROR", session_id: sessionId, reason: err.message })
+                                            }).catch(e => {});
+                                        }
+                                    });
+                                } else {
+                                    updateStatus("ERROR: SDK NOT FOUND");
+                                }
+                            }, 800);
+                        };
+                        script.onerror = () => {
+                            updateStatus("ERROR: FAILED TO LOAD SCRIPT");
+                        };
+                        document.head.appendChild(script);
+                    }
+                </script>
             </body>
             </html>
         `);
         return;
     }
 
-    // استقبال الخطوات والنتيجة النهائية (UUID) وإرسالها للماستر عبر الـ WebSocket
     if (req.method === 'POST') {
         let body = '';
         req.on('data', chunk => { body += chunk.toString(); });
