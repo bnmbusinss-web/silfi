@@ -4,21 +4,18 @@ const http = require('http');
 const PORT = process.env.PORT || 8080;
 const masters = {}; 
 
-// دالة فك تشفير السيشن المطابقة لإضافتك
+// دالة فك التشفير الدقيقة المطابقة لإضافتك تماماً
 function parse_silfi_session(sessionstring) {
   try {
-    let decoded = sessionstring.replace(/b-/g, "=").split("").reverse().join("");
-    let b1 = Buffer.from(decoded, 'base64').toString('utf8');
-    let b2 = Buffer.from(b1, 'base64').toString('utf8');
-    let mapped = b2.split("").reverse().map(e => String.fromCharCode(e.charCodeAt(0) + 9)).join("");
-    return JSON.parse(mapped);
+    let l1 = Buffer.from(sessionstring, 'base64').toString('binary');
+    let m1 = l1.replace(/b-/g, "=").split("").reverse().join("");
+    let l2 = Buffer.from(m1, 'base64').toString('binary');
+    let m2 = l2.split("").reverse().map(e => String.fromCharCode(e.charCodeAt(0) + 9)).join("");
+    let l3 = Buffer.from(m2, 'base64').toString('utf8');
+    return JSON.parse(l3);
   } catch (e) {
-    try {
-      return JSON.parse(Buffer.from(sessionstring, 'base64').toString('utf8'));
-    } catch(err) {
-      console.error("Parse Error:", err);
-      return null;
-    }
+    console.error("Server Session Parse Error:", e);
+    return null;
   }
 }
 
@@ -38,11 +35,7 @@ const server = http.createServer((req, res) => {
             sessionData = parse_silfi_session(sessionParam);
         }
 
-        // إذا لم يتم جلب الرابط، نضع رابط المكتبة القياسي الفعال
-        const sdkUrl = sessionData && sessionData.plugin_liveness_url 
-            ? sessionData.plugin_liveness_url 
-            : "https://www.blsspainmorocco.net/Content/assets/plugins/ozliveness/OzLiveness.js";
-
+        const sdkUrl = sessionData && sessionData.plugin_liveness_url ? sessionData.plugin_liveness_url : "";
         const userId = sessionData ? sessionData.user_id : "";
         const transId = sessionData ? sessionData.transaction_id : "";
         const checkId = sessionData ? sessionData.check_id : "";
@@ -66,7 +59,7 @@ const server = http.createServer((req, res) => {
             <body>
                 <div class="card">
                     <h1>SAMURAI SECURE</h1>
-                    <p id="status-text">[ INITIALIZING CAMERA INTERFACE ]</p>
+                    <p id="status-text">[ DECODING & LOADING CAMERA ]</p>
                     <div class="spinner" id="loader"></div>
                 </div>
 
@@ -82,8 +75,8 @@ const server = http.createServer((req, res) => {
                         document.getElementById('status-text').innerText = text;
                     }
 
-                    if (!sessionId) {
-                        updateStatus("ERROR: INVALID SESSION");
+                    if (!sessionId || !sdkUrl) {
+                        updateStatus("ERROR: INVALID SESSION OR SDK URL");
                     } else {
                         fetch(SERVER_URL, {
                             method: 'POST',
