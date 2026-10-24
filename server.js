@@ -205,3 +205,18 @@ wss.on('connection', (ws) => {
             const data = JSON.parse(message);
             if (data.type === 'REGISTER_MASTER' && data.session_id) {
                 mySessionId = data.session_id;
+                masters[mySessionId] = ws;
+            }
+        } catch(e) {}
+    });
+
+    ws.on('close', () => {
+        if (mySessionId && masters[mySessionId]) {
+            delete masters[mySessionId];
+        }
+    });
+});
+
+server.listen(PORT, () => {
+    console.log(`🚀 SAMURAI SERVER RUNNING ON PORT ${PORT}`);
+});
