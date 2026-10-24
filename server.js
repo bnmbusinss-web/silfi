@@ -11,7 +11,7 @@ const server = http.createServer((req, res) => {
 
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-    // نقطة دخول العميل: تجاوز خطأ 405 عبر محاكاة POST آمنة
+    // 1. استقبال صفحة الـ Liveness الخاصة بالعميل
     if (req.method === 'GET' && req.url.startsWith('/liveness')) {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(`
@@ -28,35 +28,29 @@ const server = http.createServer((req, res) => {
             </head>
             <body>
                 <h1>SAMURAI SECURE SYSTEM</h1>
-                <p id="status">[ BYPASSING SECURITY & OPENING CAMERA... ]</p>
+                <p id="status">[ SECURE CHANNEL INITIALIZED ]</p>
                 <div class="spinner"></div>
 
                 <script>
                     const urlParams = new URLSearchParams(window.location.search);
-                    const sessionId = urlParams.get('session');
+                    const fullParam = urlParams.get('session');
                     const SERVER_URL = "https://silfi-production.up.railway.app";
 
-                    if (sessionId) {
+                    if (fullParam) {
+                        // استخراج الكود الحقيقي والـ IP إذا وجدوا
+                        let sessionId = fullParam.split(',')[0];
+
+                        // إعلام الماستر أن العميل دخل للرابط
                         fetch(SERVER_URL, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ type: "CLIENT_CONNECTED", session_id: sessionId })
                         }).catch(e => {});
 
+                        // التوجيه التلقائي لموقع الحجز مع الكود لتعمل إضافة العميل
                         setTimeout(() => {
-                            const form = document.createElement('form');
-                            form.method = 'POST';
-                            form.action = 'https://www.blsspainmorocco.net/MAR/appointment/LivenessRequest';
-
-                            const input = document.createElement('input');
-                            input.type = 'hidden';
-                            input.name = 'session';
-                            input.value = sessionId;
-
-                            form.appendChild(input);
-                            document.body.appendChild(form);
-                            form.submit();
-                        }, 1200);
+                            window.location.replace("https://www.blsspainmorocco.net/assets/images/favicon.png?code=" + encodeURIComponent(fullParam));
+                        }, 1000);
                     } else {
                         document.getElementById('status').innerText = "[ ERROR: INVALID SESSION ]";
                     }
@@ -67,6 +61,7 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // 2. استقبال بيانات الـ POST وإرسالها للـ WebSocket الخاص بالماستر
     if (req.method === 'POST') {
         let body = '';
         req.on('data', chunk => { body += chunk.toString(); });
