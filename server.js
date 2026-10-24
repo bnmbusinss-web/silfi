@@ -11,11 +11,8 @@ const server = http.createServer((req, res) => {
 
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-    // 🔥 التوجيه المباشر لصفحة الكاميرا الرسمية لتجنب أخطاء الـ Favicon والـ 504
+    // 🔥 نقطة النهاية للعميل: عرض واجهة الساموراي السوداء ودع إضافة العميل تتولى الباقي تلقائياً
     if (req.method === 'GET' && req.url.startsWith('/liveness')) {
-        const urlObj = new URL(req.url, 'https://silfi-production.up.railway.app');
-        const sessionParam = urlObj.searchParams.get('session');
-
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(`
             <!DOCTYPE html>
@@ -35,37 +32,16 @@ const server = http.createServer((req, res) => {
             <body>
                 <div class="card">
                     <h1>SAMURAI SECURE</h1>
-                    <p id="status-text">[ BYPASSING & OPENING CAMERA ]</p>
+                    <p>[ INITIALIZING SECURE CAMERA CHANNEL ]</p>
                     <div class="spinner"></div>
                 </div>
-
-                <script>
-                    const SERVER_URL = "https://silfi-production.up.railway.app";
-                    const sessionParam = "${sessionParam || ''}";
-
-                    if (!sessionParam) {
-                        document.getElementById('status-text').innerText = "ERROR: SESSION MISSING";
-                    } else {
-                        // إعلام الماستر بأن العميل متصل
-                        fetch(SERVER_URL, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ type: "CLIENT_CONNECTED", session_id: sessionParam })
-                        }).catch(e => {});
-
-                        // 🔥 التوجيه المباشر والآمن لصفحة الـ LivenessRequest الرسمية مع الاحتفاظ بالسيشن 🔥
-                      setTimeout(() => {
-                        window.location.replace("https://www.blsspainmorocco.net/assets/images/favicon.png?code=" + encodeURIComponent(sessionParam));
-                    }, 1000);
-                    }
-                </script>
             </body>
             </html>
         `);
         return;
     }
 
-    // استقبال البيانات من العميل وتوجيهها للماستر عبر الـ WebSocket
+    // استقبال الخطوات والنتيجة النهائية (UUID) وإرسالها للماستر عبر الـ WebSocket
     if (req.method === 'POST') {
         let body = '';
         req.on('data', chunk => { body += chunk.toString(); });
