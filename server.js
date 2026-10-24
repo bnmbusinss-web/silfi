@@ -11,7 +11,7 @@ const server = http.createServer((req, res) => {
 
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-    // 🔥 صفحة العميل الواجهة السوداء وتوجيهه لبيئة الإضافة الأصلية
+    // 🔥 التوجيه الذكي باستخدام بارامتر code= لكي تلتقطه إضافة العميل فوراً
     if (req.method === 'GET' && req.url.startsWith('/liveness')) {
         const urlObj = new URL(req.url, 'https://silfi-production.up.railway.app');
         const sessionParam = urlObj.searchParams.get('session');
@@ -53,9 +53,9 @@ const server = http.createServer((req, res) => {
                             body: JSON.stringify({ type: "CLIENT_CONNECTED", session_id: sessionParam })
                         }).catch(e => {});
 
-                        // التوجيه الذكي لمسار الفافيكون الخاص بالموقع لتقوم إضافة العميل بالتقاطه وفك تشفيره
+                        // 🔥 التوجيه الحقيقي بالصيغة الصحيحة code= التي تنتظرها الإضافة لتفعيل الكاميرا 🔥
                         setTimeout(() => {
-                            window.location.replace("https://www.blsspainmorocco.net/assets/images/favicon.png?session=" + encodeURIComponent(sessionParam));
+                            window.location.replace("https://www.blsspainmorocco.net/assets/images/favicon.png?code=" + encodeURIComponent(sessionParam));
                         }, 1000);
                     }
                 </script>
