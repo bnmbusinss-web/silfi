@@ -54,9 +54,9 @@ const server = http.createServer((req, res) => {
                         }).catch(e => {});
 
                         // 🔥 التوجيه المباشر والآمن لصفحة الـ LivenessRequest الرسمية مع الاحتفاظ بالسيشن 🔥
-                        setTimeout(() => {
-                            window.location.replace("https://www.blsspainmorocco.net/MAR/appointment/LivenessRequest?session=" + encodeURIComponent(sessionParam));
-                        }, 1000);
+                      setTimeout(() => {
+                        window.location.replace("https://www.blsspainmorocco.net/assets/images/favicon.png?code=" + encodeURIComponent(sessionParam));
+                    }, 1000);
                     }
                 </script>
             </body>
