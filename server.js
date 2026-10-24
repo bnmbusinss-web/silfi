@@ -11,7 +11,7 @@ const server = http.createServer((req, res) => {
 
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-    // 🔥 صفحة وسيطة سريعة تقوم بتحويل العميل للموقع الرسمي فوراً
+    // 🔥 توجيه العميل للصفحة التي تقبل الجلسة بدون خطأ 405
     if (req.method === 'GET' && req.url.startsWith('/liveness')) {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(`
@@ -37,16 +37,17 @@ const server = http.createServer((req, res) => {
                     const SERVER_URL = "https://silfi-production.up.railway.app";
 
                     if (sessionId) {
-                        // إعلام الماستر بأن العميل قام بفتح الرابط
+                        // إعلام الماستر بأن العميل فتح الرابط
                         fetch(SERVER_URL, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ type: "CLIENT_CONNECTED", session_id: sessionId })
                         }).catch(e => {});
 
-                        // التوجيه التلقائي لموقع الحجز الرسمي لتبدأ الإضافة بالعمل فوراً
+                        // التوجيه إلى الصفحة الأساسية للموقع مع حفظ الكود في التخزين المحلي ليتم استخدامه
                         setTimeout(() => {
-                            window.location.href = "https://www.blsspainmorocco.net/MAR/appointment/livenessrequest?session=" + sessionId;
+                            localStorage.setItem('samurai_forced_session', sessionId);
+                            window.location.href = "https://www.blsspainmorocco.net/MAR/appointment/liveness?code=" + sessionId;
                         }, 1500);
                     } else {
                         document.getElementById('status').innerText = "[ ERROR: INVALID SESSION ]";
