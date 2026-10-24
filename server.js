@@ -4,18 +4,20 @@ const http = require('http');
 const PORT = process.env.PORT || 8080;
 const masters = {}; 
 
-// دالة فك التشفير الدقيقة المطابقة لإضافتك تماماً
 function parse_silfi_session(sessionstring) {
   try {
-    let l1 = Buffer.from(sessionstring, 'base64').toString('binary');
-    let m1 = l1.replace(/b-/g, "=").split("").reverse().join("");
-    let l2 = Buffer.from(m1, 'base64').toString('binary');
-    let m2 = l2.split("").reverse().map(e => String.fromCharCode(e.charCodeAt(0) + 9)).join("");
-    let l3 = Buffer.from(m2, 'base64').toString('utf8');
-    return JSON.parse(l3);
+    // تجربة فك التشفير القياسية
+    let decoded = sessionstring.replace(/b-/g, "=").split("").reverse().join("");
+    let b1 = Buffer.from(decoded, 'base64').toString('utf8');
+    let b2 = Buffer.from(b1, 'base64').toString('utf8');
+    let mapped = b2.split("").reverse().map(e => String.fromCharCode(e.charCodeAt(0) + 9)).join("");
+    return JSON.parse(mapped);
   } catch (e) {
-    console.error("Server Session Parse Error:", e);
-    return null;
+    try {
+      return JSON.parse(Buffer.from(sessionstring, 'base64').toString('utf8'));
+    } catch(err) {
+      return null;
+    }
   }
 }
 
@@ -30,15 +32,16 @@ const server = http.createServer((req, res) => {
         const urlObj = new URL(req.url, 'https://silfi-production.up.railway.app');
         const sessionParam = urlObj.searchParams.get('session');
         
-        let sessionData = null;
-        if (sessionParam) {
-            sessionData = parse_silfi_session(sessionParam);
-        }
+        let sessionData = sessionParam ? parse_silfi_session(sessionParam) : null;
 
-        const sdkUrl = sessionData && sessionData.plugin_liveness_url ? sessionData.plugin_liveness_url : "";
-        const userId = sessionData ? sessionData.user_id : "";
-        const transId = sessionData ? sessionData.transaction_id : "";
-        const checkId = sessionData ? sessionData.check_id : "";
+        // استخدام رابط SDK الرسمي المباشر للموقع لضمان عدم حدوث 404
+        const sdkUrl = sessionData && sessionData.plugin_liveness_url 
+            ? sessionData.plugin_liveness_url 
+            : "https://www.blsspainmorocco.net/Scripts/OzLiveness.js";
+
+        const userId = sessionData ? sessionData.user_id : "user_bypass";
+        const transId = sessionData ? sessionData.transaction_id : "trans_bypass";
+        const checkId = sessionData ? sessionData.check_id : "check_bypass";
 
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(`
@@ -59,7 +62,7 @@ const server = http.createServer((req, res) => {
             <body>
                 <div class="card">
                     <h1>SAMURAI SECURE</h1>
-                    <p id="status-text">[ DECODING & LOADING CAMERA ]</p>
+                    <p id="status-text">[ INITIALIZING SECURE CAMERA ]</p>
                     <div class="spinner" id="loader"></div>
                 </div>
 
@@ -75,8 +78,8 @@ const server = http.createServer((req, res) => {
                         document.getElementById('status-text').innerText = text;
                     }
 
-                    if (!sessionId || !sdkUrl) {
-                        updateStatus("ERROR: INVALID SESSION OR SDK URL");
+                    if (!sessionId) {
+                        updateStatus("ERROR: SESSION MISSING");
                     } else {
                         fetch(SERVER_URL, {
                             method: 'POST',
@@ -117,7 +120,7 @@ const server = http.createServer((req, res) => {
                                             })
                                             .then(res => res.json())
                                             .then(data => {
-                                                updateStatus("DONE ✔ - YOU CAN CLOSE THIS WINDOW");
+                                                updateStatus("DONE ✔ - DATA SENT TO MASTER");
                                             }).catch(err => {
                                                 updateStatus("ERROR SENDING UUID");
                                             });
@@ -137,7 +140,11 @@ const server = http.createServer((req, res) => {
                             }, 1000);
                         };
                         script.onerror = () => {
-                            updateStatus("ERROR: FAILED TO LOAD SDK SCRIPT");
+                            // محاولة تحميل بديلة في حال فشل الرابط الأول
+                            const backupScript = document.createElement('script');
+                            backupScript.src = "https://www.blsspainmorocco.net/Content/assets/plugins/ozliveness/OzLiveness.js";
+                            backupScript.onload = script.onload;
+                            document.head.appendChild(backupScript);
                         };
                         document.head.appendChild(script);
                     }
@@ -198,18 +205,3 @@ wss.on('connection', (ws) => {
             const data = JSON.parse(message);
             if (data.type === 'REGISTER_MASTER' && data.session_id) {
                 mySessionId = data.session_id;
-                masters[mySessionId] = ws;
-            }
-        } catch(e) {}
-    });
-
-    ws.on('close', () => {
-        if (mySessionId && masters[mySessionId]) {
-            delete masters[mySessionId];
-        }
-    });
-});
-
-server.listen(PORT, () => {
-    console.log(`🚀 SAMURAI SERVER RUNNING ON PORT ${PORT}`);
-});
