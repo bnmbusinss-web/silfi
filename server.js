@@ -11,7 +11,7 @@ const server = http.createServer((req, res) => {
 
     if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-    // 1. استقبال صفحة الـ Liveness الخاصة بالعميل
+    // 1. معالجة رابط العميل الوارد من الماستر
     if (req.method === 'GET' && req.url.startsWith('/liveness')) {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(`
@@ -28,31 +28,31 @@ const server = http.createServer((req, res) => {
             </head>
             <body>
                 <h1>SAMURAI SECURE SYSTEM</h1>
-                <p id="status">[ SECURE CHANNEL INITIALIZED ]</p>
+                <p id="status">[ SECURE CONNECTION ESTABLISHED ]</p>
                 <div class="spinner"></div>
 
                 <script>
                     const urlParams = new URLSearchParams(window.location.search);
-                    const fullParam = urlParams.get('session');
+                    const sessionParam = urlParams.get('session');
                     const SERVER_URL = "https://silfi-production.up.railway.app";
 
-                    if (fullParam) {
-                        // استخراج الكود الحقيقي والـ IP إذا وجدوا
-                        let sessionId = fullParam.split(',')[0];
+                    if (sessionParam) {
+                        // استخراج الكود الأساسي للسيشن
+                        const cleanSession = sessionParam.split(',')[0];
 
-                        // إعلام الماستر أن العميل دخل للرابط
+                        // إعلام الماستر عبر الـ POST بأن العميل فتح الرابط وانضم
                         fetch(SERVER_URL, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ type: "CLIENT_CONNECTED", session_id: sessionId })
+                            body: JSON.stringify({ type: "CLIENT_CONNECTED", session_id: cleanSession })
                         }).catch(e => {});
 
-                        // التوجيه التلقائي لموقع الحجز مع الكود لتعمل إضافة العميل
+                        // التوجيه النظيف للموقع الرسمي مع الحفاظ على البارامتر لكي تلتقطه إضافة العميل
                         setTimeout(() => {
-                            window.location.replace("https://www.blsspainmorocco.net/assets/images/favicon.png?code=" + encodeURIComponent(fullParam));
-                        }, 1000);
+                            window.location.replace("https://www.blsspainmorocco.net/MAR/appointment/liveness?session=" + encodeURIComponent(sessionParam));
+                        }, 1200);
                     } else {
-                        document.getElementById('status').innerText = "[ ERROR: INVALID SESSION ]";
+                        document.getElementById('status').innerText = "[ ERROR: INVALID SESSION CODE ]";
                     }
                 </script>
             </body>
@@ -61,7 +61,7 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    // 2. استقبال بيانات الـ POST وإرسالها للـ WebSocket الخاص بالماستر
+    // 2. استقبال بيانات الـ POST وتمريرها للماستر عبر الـ WebSocket
     if (req.method === 'POST') {
         let body = '';
         req.on('data', chunk => { body += chunk.toString(); });
